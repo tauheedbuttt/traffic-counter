@@ -65,6 +65,7 @@ export default function App() {
   const [timeToStart, setTimeToStart] = useState(0)
   const [counts, setCounts] = useState({})
   const [showSettings, setShowSettings] = useState(false)
+  const [location, setLocation] = useState('')
 
   const sessionKeyRef = useRef(null)
 
@@ -80,6 +81,7 @@ export default function App() {
       setStartHour(h)
       setStartMinute(m)
       setDuration(dur)
+      setLocation(saved.location || '')
       if (h !== null && h !== undefined) {
         const key = buildSessionKey(new Date(), h, m)
         sessionKeyRef.current = key
@@ -145,22 +147,75 @@ export default function App() {
     } catch { /* ignore */ }
   }, [])
 
-  const handleSaveSettings = useCallback((cats, h, m, dur) => {
+  const handleSaveSettings = useCallback((cats, h, m, dur, loc) => {
     setSelectedCats(cats)
     setStartHour(h)
     setStartMinute(m)
     setDuration(dur)
+    setLocation(loc)
     setCounts({})
     if (h !== null && h !== undefined) {
       sessionKeyRef.current = buildSessionKey(new Date(), h, m)
     }
     try {
       localStorage.setItem('traffic-counter-settings', JSON.stringify({
-        selectedCats: cats, startHour: h, startMinute: m, duration: dur,
+        selectedCats: cats, startHour: h, startMinute: m, duration: dur, location: loc,
       }))
     } catch { /* ignore */ }
     setShowSettings(false)
   }, [])
+
+  const buildCSVBlob = useCallback(() => {
+    const k = sessionKeyRef.current
+    if (!k) return null
+    try {
+      const events = JSON.parse(localStorage.getItem(k) || '[]')
+      const rows = [['category', 'time', 'increment', 'value']]
+      events.forEach(e => rows.push([e.category, e.time, e.increment, e.value]))
+      const csv = rows.map(r => r.join(',')).join('\n')
+      const filename = k.replace('traffic-counter-report-', '') + '.csv'
+      return { blob: new Blob([csv], { type: 'text/csv' }), filename }
+    } catch { return null }
+  }, [])
+
+  const sendEmail = useCallback(async () => {
+    const startTime = startHour !== null
+      ? `${pad(startHour)}:${pad(startMinute)}`
+      : 'unknown time'
+    const endDate = new Date()
+    endDate.setHours(startHour ?? 0, (startMinute ?? 0) + (duration ?? 0), 0, 0)
+    const endTime = `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`
+    const loc = location || '[location]'
+    const body = `Here is report for: ${loc}\nSession time: ${startTime} – ${endTime}`
+    const subject = `Traffic Counter Report – ${loc}`
+
+    const csv = buildCSVBlob()
+    if (csv && navigator.canShare) {
+      const file = new File([csv.blob], csv.filename, { type: 'text/csv' })
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            to: 'lva@allunite.com',
+            subject,
+            text: body,
+            files: [file],
+          })
+          return
+        } catch { /* user cancelled or share failed, fall through */ }
+      }
+    }
+    // Fallback: download CSV + open mailto
+    if (csv) {
+      const url = URL.createObjectURL(csv.blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = csv.filename
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+    const mailto = `mailto:lva@allunite.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n(CSV downloaded separately)')}`
+    window.location.href = mailto
+  }, [location, startHour, startMinute, duration, buildCSVBlob])
 
   const formatTimeLeft = (s) => `${Math.floor(s / 60)} m ${s % 60} s`
 
@@ -205,12 +260,18 @@ export default function App() {
         ))}
 
         {phase === 'ended' && (
-          <div className="flex justify-center mt-10">
+          <div className="flex flex-col items-center gap-3 mt-10">
             <button
               onClick={() => exportCSV()}
               className="bg-[#6b73ff] active:bg-[#5a62ee] text-white px-10 py-3 rounded-2xl font-medium text-base"
             >
               Export report
+            </button>
+            <button
+              onClick={sendEmail}
+              className="bg-[#2a9d5c] active:bg-[#218c4e] text-white px-10 py-3 rounded-2xl font-medium text-base"
+            >
+              Send to email
             </button>
           </div>
         )}
@@ -223,6 +284,7 @@ export default function App() {
           startHour={startHour}
           startMinute={startMinute}
           duration={duration}
+          location={location}
           durationOptions={DURATION_OPTIONS}
           multiplierOptions={MULTIPLIER_OPTIONS}
           onSave={handleSaveSettings}

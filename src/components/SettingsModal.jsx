@@ -6,6 +6,7 @@ export default function SettingsModal({
   startHour,
   startMinute,
   duration,
+  location,
   durationOptions,
   multiplierOptions,
   onSave,
@@ -20,6 +21,7 @@ export default function SettingsModal({
   const [hour, setHour] = useState(startHour !== null && startHour !== undefined ? String(startHour) : '')
   const [minute, setMinute] = useState(startMinute ?? 0)
   const [dur, setDur] = useState(duration ?? 60)
+  const [loc, setLoc] = useState(location || '')
   const [historyOpen, setHistoryOpen] = useState(false)
 
   const now = new Date()
@@ -58,7 +60,7 @@ export default function SettingsModal({
 
   const handleClose = () => {
     const selected = cats.filter(c => c.selected).map(c => ({ name: c.name, multiplier: c.multiplier }))
-    onSave(selected, hour === '' ? null : Number(hour), Number(minute), Number(dur))
+    onSave(selected, hour === '' ? null : Number(hour), Number(minute), Number(dur), loc)
   }
 
   const buildStr = (() => {
@@ -115,6 +117,18 @@ export default function SettingsModal({
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Location */}
+      <div className="flex-shrink-0 border-t border-gray-200 px-4 py-3">
+        <label className="block text-xs text-gray-500 mb-1">Location name</label>
+        <input
+          type="text"
+          value={loc}
+          onChange={e => setLoc(e.target.value)}
+          placeholder="e.g. Main Street / North Gate"
+          className="border border-gray-300 rounded px-2 py-2 text-sm bg-white text-gray-800 w-full outline-none focus:border-blue-400"
+        />
       </div>
 
       {/* Time / Duration row */}
