@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Logo from './components/Logo'
 import SettingsModal from './components/SettingsModal'
 import CounterRow from './components/CounterRow'
+import { pad, buildSessionKey, formatEventTime, getSessionPhase, restoreCounts } from './utils'
 
 const ALL_CATEGORIES = [
   'Pedestrians', 'Pedestrians in', 'Pedestrians out',
@@ -11,49 +12,6 @@ const ALL_CATEGORIES = [
 
 const DURATION_OPTIONS = [1, 30, 60, 90]
 const MULTIPLIER_OPTIONS = [1, 2, 5, 10]
-
-function pad(n) {
-  return String(n).padStart(2, '0')
-}
-
-function buildSessionKey(date, hour, minute) {
-  const y = date.getFullYear()
-  const mo = pad(date.getMonth() + 1)
-  const d = pad(date.getDate())
-  return `traffic-counter-report-${y}${mo}${d}_${pad(hour)}_${pad(minute)}`
-}
-
-function formatEventTime(date) {
-  const mo = pad(date.getMonth() + 1)
-  const d = pad(date.getDate())
-  const y = date.getFullYear()
-  let h = date.getHours()
-  const ampm = h >= 12 ? 'PM' : 'AM'
-  h = h % 12 || 12
-  return `${mo}/${d}/${y} ${pad(h)}:${pad(date.getMinutes())}:${pad(date.getSeconds())} ${ampm}`
-}
-
-function getSessionPhase(startHour, startMinute, durationMin) {
-  const now = new Date()
-  const start = new Date(now)
-  start.setHours(startHour, startMinute, 0, 0)
-  const end = new Date(start.getTime() + durationMin * 60000)
-  if (now >= end) return { phase: 'ended', timeLeft: 0, timeToStart: 0 }
-  if (now >= start) return { phase: 'active', timeLeft: Math.floor((end - now) / 1000), timeToStart: 0 }
-  const timeToStart = Math.floor((start - now) / 1000)
-  return { phase: 'idle', timeLeft: 0, timeToStart }
-}
-
-function restoreCounts(key) {
-  try {
-    const events = JSON.parse(localStorage.getItem(key) || '[]')
-    const counts = {}
-    events.forEach(e => { counts[e.category] = e.value })
-    return counts
-  } catch {
-    return {}
-  }
-}
 
 export default function App() {
   const [selectedCats, setSelectedCats] = useState([])
