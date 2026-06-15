@@ -38,9 +38,10 @@ function getSessionPhase(startHour, startMinute, durationMin) {
   const start = new Date(now)
   start.setHours(startHour, startMinute, 0, 0)
   const end = new Date(start.getTime() + durationMin * 60000)
-  if (now >= end) return { phase: 'ended', timeLeft: 0 }
-  if (now >= start) return { phase: 'active', timeLeft: Math.floor((end - now) / 1000) }
-  return { phase: 'idle', timeLeft: 0 }
+  if (now >= end) return { phase: 'ended', timeLeft: 0, timeToStart: 0 }
+  if (now >= start) return { phase: 'active', timeLeft: Math.floor((end - now) / 1000), timeToStart: 0 }
+  const timeToStart = Math.floor((start - now) / 1000)
+  return { phase: 'idle', timeLeft: 0, timeToStart }
 }
 
 function restoreCounts(key) {
@@ -61,6 +62,7 @@ export default function App() {
   const [duration, setDuration] = useState(60)
   const [phase, setPhase] = useState('idle')
   const [timeLeft, setTimeLeft] = useState(0)
+  const [timeToStart, setTimeToStart] = useState(0)
   const [counts, setCounts] = useState({})
   const [showSettings, setShowSettings] = useState(false)
 
@@ -92,9 +94,10 @@ export default function App() {
     const key = buildSessionKey(new Date(), startHour, startMinute)
     sessionKeyRef.current = key
     const tick = () => {
-      const { phase: p, timeLeft: tl } = getSessionPhase(startHour, startMinute, duration)
+      const { phase: p, timeLeft: tl, timeToStart: tts } = getSessionPhase(startHour, startMinute, duration)
       setPhase(p)
       setTimeLeft(tl)
+      setTimeToStart(tts)
     }
     tick()
     const id = setInterval(tick, 1000)
@@ -170,6 +173,11 @@ export default function App() {
           {phase === 'active' && (
             <p className="text-orange-400 text-sm mt-0.5 font-medium">
               Before end: {formatTimeLeft(timeLeft)}
+            </p>
+          )}
+          {phase === 'idle' && timeToStart > 0 && timeToStart <= 60 && (
+            <p className="text-orange-400 text-sm mt-0.5 font-medium">
+              Before start: {formatTimeLeft(timeToStart)}
             </p>
           )}
         </div>
